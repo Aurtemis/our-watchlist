@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Our Watchlist">
+<meta name="theme-color" content="#f2ede6">
+<title>Our Watchlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f2ede6;
+    --bg2: #ebe4db;
+    --card-bg: #faf8f5;
+    --ink: #1a1714;
+    --ink2: #6b6459;
+    --ink3: #a09890;
+    --accent: #c0392b;
+    --accent2: #e8d5b0;
+    --border: #ddd5c8;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    --r: 4px;
+    --font-display: 'Playfair Display', serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+
+  /* GRAIN OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* HEADER */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    backdrop-filter: blur(8px);
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .user-badge {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink2);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+  }
+  .user-badge:hover { background: var(--border); }
+
+  .add-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s, background 0.2s;
+    flex-shrink: 0;
+  }
+  .add-btn:hover { background: var(--accent); transform: scale(1.08); }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 0;
+    padding: 16px 20px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .tab {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    color: var(--ink3);
+    padding: 8px 0 12px;
+    margin-right: 24px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s;
+  }
+  .tab.active {
+    color: var(--ink);
+  }
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 2px;
+    background: var(--ink);
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* MAIN CONTENT */
+  .main { padding: 24px 16px; max-width: 1200px; margin: 0 auto; }
+
+  /* WATCHLIST GRID */
+  .watchlist-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  @media (min-width: 600px) {
+    .watchlist-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .main { padding: 28px 20px; }
+  }
+  @media (min-width: 900px) {
+    .watchlist-grid { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  }
+  @media (min-width: 1100px) {
+    .watchlist-grid { grid-template-columns: repeat(6, 1fr); }
+  }
+
+  /* MOVIE CARD */
+  .movie-card {
+    cursor: pointer;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .movie-card:nth-child(1) { animation-delay: 0.05s; }
+  .movie-card:nth-child(2) { animation-delay: 0.1s; }
+  .movie-card:nth-child(3) { animation-delay: 0.15s; }
+  .movie-card:nth-child(4) { animation-delay: 0.2s; }
+  .movie-card:nth-child(5) { animation-delay: 0.25s; }
+  .movie-card:nth-child(6) { animation-delay: 0.3s; }
+
+  .poster-wrap {
+    position: relative;
+    aspect-ratio: 2/3;
+    border-radius: var(--r);
+    overflow: hidden;
+    background: var(--bg2);
+    box-shadow: var(--shadow);
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s;
+  }
+  .movie-card:hover .poster-wrap {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .poster-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .poster-placeholder {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 12px;
+    text-align: center;
+    background: linear-gradient(160deg, #2a2420, #1a1410);
+    position: relative;
+    overflow: hidden;
+  }
+  .poster-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      45deg, transparent, transparent 2px,
+      rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px
+    );
+  }
+  .poster-placeholder .ph-title {
+    font-family: var(--font-display);
+    font-size: clamp(0.6rem, 2.5vw, 0.9rem);
+    color: #f0e6d0;
+    line-height: 1.3;
+    position: relative;
+    z-index: 1;
+  }
+  .poster-placeholder .ph-icon {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+    opacity: 0.4;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* CARD DELETE OVERLAY - Letterboxd style */
+  .poster-wrap {
+    position: relative;
+  }
+  .card-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(15,12,10,0.72);
+    border: none;
+    color: #fff;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s;
+    z-index: 10;
+    line-height: 1;
+    backdrop-filter: blur(4px);
+  }
+  .movie-card:hover .card-delete {
+    opacity: 1;
+    transform: scale(1);
+  }
+  /* Always visible on touch devices */
+  @media (hover: none) {
+    .card-delete {
+      opacity: 1;
+      transform: scale(1);
+      background: rgba(15,12,10,0.55);
+    }
+  }
+  .card-delete:hover {
+    background: var(--accent) !important;
+    transform: scale(1.1) !important;
+  }
+
+  /* MARK WATCHED BUTTON on card */
+  .card-watch {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(15,12,10,0.72);
+    border: none;
+    color: #fff;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+  }
+  .movie-card:hover .card-watch {
+    opacity: 1;
+    transform: scale(1);
+  }
+  @media (hover: none) {
+    .card-watch {
+      opacity: 1;
+      transform: scale(1);
+      background: rgba(15,12,10,0.55);
+    }
+  }
+  .card-watch:hover {
+    background: #2e7d4f !important;
+    transform: scale(1.1) !important;
+  }
+
+  /* EYE / WATCHING BUTTON */
+  .card-eye {
+    position: absolute;
+    bottom: 6px;
+    left: 38px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(15,12,10,0.72);
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+  }
+  .movie-card:hover .card-eye {
+    opacity: 1;
+    transform: scale(1);
+  }
+  @media (hover: none) {
+    .card-eye {
+      opacity: 1;
+      transform: scale(1);
+      background: rgba(15,12,10,0.55);
+    }
+  }
+  .card-eye:hover {
+    background: #1a5f9e !important;
+    transform: scale(1.1) !important;
+  }
+
+  /* Tab count badge */
+  .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--border);
+    color: var(--ink2);
+    font-size: 0.55rem;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    padding: 0 4px;
+    margin-left: 4px;
+    vertical-align: middle;
+    font-family: var(--font-mono);
+  }
+  .tab.active .tab-count { background: var(--ink); color: var(--bg); }
+  .tab-count--eye { background: #1a5f9e22; color: #1a5f9e; }
+  .tab.active .tab-count--eye { background: var(--ink); color: var(--bg); }
+
+  /* QUICK DATE PICKER POPUP */
+  .date-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26,23,20,0.5);
+    backdrop-filter: blur(4px);
+    animation: overlayIn 0.15s ease;
+  }
+  .date-popup-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    width: 280px;
+    box-shadow: var(--shadow-lg);
+    animation: popIn 0.2s cubic-bezier(0.34,1.4,0.64,1);
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .date-popup-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-style: italic;
+    margin-bottom: 4px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .date-popup-sub {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--ink3);
+    margin-bottom: 16px;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+  .date-popup input[type="date"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--ink);
+    outline: none;
+    margin-bottom: 12px;
+    -webkit-appearance: none;
+  }
+  .date-popup-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .date-popup-confirm {
+    flex: 1;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--r);
+    padding: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .date-popup-confirm:hover { background: #2e7d4f; }
+  .date-popup-cancel {
+    background: transparent;
+    color: var(--ink3);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .date-popup-cancel:hover { color: var(--ink); }
+
+  .card-meta {
+    padding: 6px 2px 0;
+  }
+  .card-title {
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+  .card-sub {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--ink3);
+    margin-top: 2px;
+    text-transform: lowercase;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .empty-state .e-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state .e-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-style: italic;
+    color: var(--ink2);
+    margin-bottom: 6px;
+  }
+  .empty-state .e-sub {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink3);
+    text-transform: lowercase;
+  }
+
+  /* LOG VIEW */
+  .log-view {}
+
+  .month-group {
+    margin-bottom: 40px;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .month-label {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+  }
+  .month-label span {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink3);
+    font-style: normal;
+    margin-left: 10px;
+    vertical-align: middle;
+    letter-spacing: 0.05em;
+  }
+
+  .month-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (min-width: 600px) {
+    .month-cards { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  }
+  @media (min-width: 900px) {
+    .month-cards { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  }
+
+  /* MODAL OVERLAY */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26,23,20,0.6);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: overlayIn 0.2s ease;
+  }
+  @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    background: var(--card-bg);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 16px 16px 0 0;
+    padding: 24px 24px 40px;
+    animation: sheetUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  @media (min-width: 600px) {
+    .overlay { align-items: center; }
+    .modal { border-radius: 12px; max-height: 85vh; }
+  }
+  @keyframes sheetUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  @media (min-width: 600px) { .modal-handle { display: none; } }
+
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-style: italic;
+    margin-bottom: 20px;
+    color: var(--ink);
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--ink3);
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--ink);
+  }
+  .field textarea { resize: none; height: 72px; }
+
+  .user-selector {
+    display: flex;
+    gap: 8px;
+  }
+  .user-opt {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink2);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+  .user-opt.active {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .submit-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--r);
+    padding: 14px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .submit-btn:hover { background: #a93226; }
+  .submit-btn:active { transform: scale(0.98); }
+  .submit-btn:disabled { background: var(--ink3); cursor: not-allowed; }
+
+  /* DETAIL MODAL */
+  .detail-modal {
+    background: var(--card-bg);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 16px 16px 0 0;
+    animation: sheetUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
+    overflow: hidden;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 600px) {
+    .detail-modal { border-radius: 12px; max-height: 88vh; }
+  }
+
+  .detail-poster {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    background: var(--bg2);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .detail-poster img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .detail-poster-placeholder {
+    width: 100%; height: 100%;
+    background: linear-gradient(160deg, #2a2420, #1a1410);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3rem;
+  }
+
+  .detail-body {
+    padding: 20px 24px 32px;
+    overflow-y: auto;
+  }
+
+  .detail-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  .detail-meta {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--ink3);
+    margin-bottom: 14px;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+  .detail-note {
+    font-size: 0.85rem;
+    color: var(--ink2);
+    line-height: 1.6;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+
+  .detail-actions { display: flex; flex-direction: column; gap: 8px; }
+
+  .watched-btn {
+    width: 100%;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--r);
+    padding: 14px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .watched-btn:hover { background: var(--accent); }
+
+  .delete-btn {
+    width: 100%;
+    background: transparent;
+    color: var(--ink3);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .delete-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .watched-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--ink2);
+    text-transform: lowercase;
+    margin-bottom: 16px;
+  }
+  .watched-badge::before {
+    content: '✓';
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  /* DATE PICKER ROW */
+  .date-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .date-row input[type="date"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--ink);
+    outline: none;
+    -webkit-appearance: none;
+  }
+
+  /* CLOSE BTN */
+  .close-btn {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
+
+  /* LOADING */
+  .loading-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--accent);
+    z-index: 9998;
+    animation: loadBar 1.2s ease infinite;
+  }
+  @keyframes loadBar {
+    0% { width: 0; left: 0; }
+    50% { width: 70%; left: 0; }
+    100% { width: 0; left: 100%; }
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--ink);
+    color: var(--bg);
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    z-index: 9997;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* USER SETUP */
+  .setup-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 9990;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .setup-card {
+    max-width: 320px;
+    width: 100%;
+    text-align: center;
+  }
+  .setup-card .setup-logo {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+  .setup-card .setup-sub {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--ink3);
+    margin-bottom: 32px;
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+  }
+  .setup-card .setup-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--ink3);
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+    text-align: left;
+  }
+  .setup-opts {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .setup-opt {
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink2);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+  .setup-opt:hover, .setup-opt.active {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  /* SYNCING INDICATOR */
+  .sync-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink3);
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+    transition: background 0.3s;
+  }
+  .sync-dot.syncing {
+    background: var(--accent);
+    animation: pulse 1s ease infinite;
+  }
+  .sync-dot.synced { background: #5a9e6f; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING BAR -->
+<div class="loading-bar" id="loadingBar" style="display:none"></div>
+
+<!-- DATE POPUP -->
+<div class="date-popup" id="datePopup" style="display:none">
+  <div class="date-popup-card">
+    <div class="date-popup-title" id="datePopupTitle"></div>
+    <div class="date-popup-sub">when did you watch it?</div>
+    <input type="date" id="datePopupInput">
+    <div class="date-popup-actions">
+      <button class="date-popup-confirm" id="datePopupConfirm">move to log ✓</button>
+      <button class="date-popup-cancel" id="datePopupCancel">cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- APP -->
+<div id="app">
+  <!-- Rendered by JS -->
+</div>
+
+<script>
+// ─── SUPABASE ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://uxzeqtiosybttmioymlu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4emVxdGlvc3lidHRtaW95bWx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNDQ1ODIsImV4cCI6MjA4ODcyMDU4Mn0.9zGRwlhPfmGQQYp8Z-R2w2z2wqGH1TMH4RLe2Jy-bbI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── OMDB ────────────────────────────────────────────────────────────────────
+const OMDB_KEY = '2d010114';
+
+async function fetchPoster(title) {
+  try {
+    const r = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${OMDB_KEY}`);
+    const d = await r.json();
+    if (d.Poster && d.Poster !== 'N/A') return d.Poster;
+  } catch(e) {}
+  // Generate a cinematic SVG poster based on title
+  return generatePoster(title);
+}
+
+function generatePoster(title) {
+  // Pick palette based on title character codes for variety
+  const seed = title.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const palettes = [
+    { bg1: '#0d1b2a', bg2: '#1b2838', accent: '#e8c547', text: '#f5f0e8' },
+    { bg1: '#1a0a0a', bg2: '#2d1515', accent: '#e85d4a', text: '#f5ede8' },
+    { bg1: '#0a1a0f', bg2: '#0f2d1a', accent: '#4ae87a', text: '#e8f5ec' },
+    { bg1: '#0a0a1a', bg2: '#15152d', accent: '#8a7ae8', text: '#eee8f5' },
+    { bg1: '#1a100a', bg2: '#2d1e0f', accent: '#e8a54a', text: '#f5efe8' },
+    { bg1: '#0a1a1a', bg2: '#0f2d2d', accent: '#4ae8e0', text: '#e8f5f5' },
+    { bg1: '#1a1a0a', bg2: '#2a2d0f', accent: '#c8e84a', text: '#f3f5e8' },
+    { bg1: '#1a0a14', bg2: '#2d0f22', accent: '#e84ab4', text: '#f5e8f0' },
+  ];
+  const p = palettes[seed % palettes.length];
+
+  // Split title into lines
+  const words = title.split(' ');
+  let lines = [];
+  let current = '';
+  for (const w of words) {
+    if ((current + ' ' + w).trim().length > 12) {
+      if (current) lines.push(current.trim());
+      current = w;
+    } else {
+      current = (current + ' ' + w).trim();
+    }
+  }
+  if (current) lines.push(current.trim());
+
+  const lineHeight = 38;
+  const totalTextH = lines.length * lineHeight;
+  const startY = 280 - totalTextH / 2;
+
+  // Decorative shapes based on seed
+  const shapes = [
+    `<circle cx="100" cy="80" r="60" fill="${p.accent}" opacity="0.08"/>`,
+    `<rect x="20" y="20" width="80" height="80" fill="${p.accent}" opacity="0.05" transform="rotate(${seed % 45} 60 60)"/>`,
+    `<line x1="0" y1="${100 + seed % 60}" x2="200" y2="${200 + seed % 80}" stroke="${p.accent}" stroke-width="0.5" opacity="0.3"/>`,
+    `<ellipse cx="150" cy="100" rx="70" ry="40" fill="${p.accent}" opacity="0.06" transform="rotate(${seed % 30})"/>`,
+  ];
+  const shape = shapes[seed % shapes.length];
+
+  // Scanline pattern
+  const scanlines = Array.from({length: 30}, (_, i) =>
+    `<line x1="0" y1="${i * 20}" x2="200" y2="${i * 20}" stroke="${p.accent}" stroke-width="0.3" opacity="0.06"/>`
+  ).join('');
+
+  const textLines = lines.map((line, i) =>
+    `<text x="100" y="${startY + i * lineHeight}" 
+      font-family="Georgia, serif" 
+      font-size="${lines.length > 2 ? 22 : 26}" 
+      font-weight="bold" 
+      fill="${p.text}" 
+      text-anchor="middle" 
+      letter-spacing="2">${line.toUpperCase()}</text>`
+  ).join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" width="200" height="300">
+    <defs>
+      <linearGradient id="bg${seed}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${p.bg1}"/>
+        <stop offset="100%" stop-color="${p.bg2}"/>
+      </linearGradient>
+      <linearGradient id="fade${seed}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="60%" stop-color="transparent"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0.7)"/>
+      </linearGradient>
+    </defs>
+    <rect width="200" height="300" fill="url(#bg${seed})"/>
+    ${scanlines}
+    ${shape}
+    <rect x="0" y="0" width="200" height="4" fill="${p.accent}" opacity="0.6"/>
+    <rect x="0" y="296" width="200" height="4" fill="${p.accent}" opacity="0.6"/>
+    <rect x="0" y="0" width="4" height="300" fill="${p.accent}" opacity="0.2"/>
+    <rect x="196" y="0" width="4" height="300" fill="${p.accent}" opacity="0.2"/>
+    <rect width="200" height="300" fill="url(#fade${seed})"/>
+    ${textLines}
+    <text x="100" y="288" font-family="'DM Mono', monospace" font-size="7" fill="${p.accent}" text-anchor="middle" opacity="0.7" letter-spacing="3">OUR WATCHLIST</text>
+  </svg>`;
+
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let state = {
+  movies: [],
+  tab: 'watchlist',
+  currentUser: localStorage.getItem('ourwatchlist_user') || null,
+  showAdd: false,
+  showDetail: null,
+  loading: true,
+  addForm: { title: '', note: '', user: null },
+  watchDate: new Date().toISOString().split('T')[0],
+};
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+// ─── SUPABASE OPS ────────────────────────────────────────────────────────────
+async function loadMovies() {
+  const { data, error } = await sb.from('movies').select('*').order('added_at', { ascending: false });
+  if (!error) setState({ movies: data || [], loading: false });
+  else { setState({ loading: false }); toast('could not load movies'); }
+}
+
+async function addMovie(title, note, addedBy) {
+  showLoading();
+  let posterUrl = null;
+  try { posterUrl = await fetchPoster(title); } catch(e) { console.error('poster fetch failed', e); }
+  console.log('Inserting movie:', { title, note, added_by: addedBy, poster_url: posterUrl });
+  const { data, error } = await sb.from('movies').insert([{
+    title: title,
+    note: note || null,
+    added_by: addedBy,
+    poster_url: posterUrl,
+    watched: false,
+    watched_at: null
+  }]).select();
+  hideLoading();
+  if (error) {
+    console.error('Supabase insert error:', JSON.stringify(error));
+    toast('error: ' + (error.message || 'insert failed'));
+    return;
+  }
+  console.log('Insert success:', data);
+  toast('"' + title + '" added ✓');
+}
+
+async function markWatching(id) {
+  const { data, error } = await sb.from('movies').update({ watching: true }).eq('id', id).select();
+  if (error) {
+    console.error('markWatching error:', JSON.stringify(error));
+    toast('error: ' + (error.message || 'could not update'));
+  } else {
+    console.log('markWatching success:', data);
+    toast('moved to watching 👁');
+  }
+}
+
+async function markWatched(id, watchedAt) {
+  const { error } = await sb.from('movies').update({ watched: true, watched_at: watchedAt, watching: false }).eq('id', id);
+  if (error) toast('could not update');
+  else toast('moved to log ✓');
+}
+
+async function deleteMovie(id) {
+  const { error } = await sb.from('movies').delete().eq('id', id);
+  if (error) toast('could not delete');
+  else toast('removed');
+}
+
+// ─── REALTIME ────────────────────────────────────────────────────────────────
+function subscribeRealtime() {
+  sb.channel('movies_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'movies' }, () => {
+      loadMovies();
+    })
+    .subscribe();
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function showLoading() { document.getElementById('loadingBar').style.display = 'block'; }
+function hideLoading() { document.getElementById('loadingBar').style.display = 'none'; }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getMonthKey(d) {
+  const date = new Date(d);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+}
+
+function formatMonthLabel(key) {
+  const [y, m] = key.split('-');
+  const date = new Date(parseInt(y), parseInt(m)-1, 1);
+  return date.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
+}
+
+function groupByMonth(movies) {
+  const groups = {};
+  movies.forEach(m => {
+    const key = getMonthKey(m.watched_at);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(m);
+  });
+  return Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById('app');
+  if (!state.currentUser) { app.innerHTML = renderSetup(); bindSetup(); return; }
+
+  app.innerHTML = `
+    ${renderHeader()}
+    ${renderTabs()}
+    <div class="main">
+      ${state.tab === 'watchlist' ? renderWatchlist() : state.tab === 'watching' ? renderWatching() : renderLog()}
+    </div>
+    ${state.showAdd ? renderAddModal() : ''}
+    ${state.showDetail ? renderDetailModal() : ''}
+  `;
+
+  bindEvents();
+}
+
+function renderSetup() {
+  return `
+    <div class="setup-screen">
+      <div class="setup-card">
+        <div class="setup-logo">Our Watchlist</div>
+        <div class="setup-label">choose your profile</div>
+        <div class="setup-opts">
+          <button class="setup-opt" data-user="User A">Aurinee</button>
+          <button class="setup-opt" data-user="User B">user b</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHeader() {
+  return `
+    <header class="header">
+      <div class="logo">Our Watchlist</div>
+      <div class="header-right">
+        <button class="user-badge" id="switchUser">${state.currentUser.toLowerCase()}</button>
+        <button class="add-btn" id="openAdd">+</button>
+      </div>
+    </header>
+  `;
+}
+
+function renderTabs() {
+  const counts = {
+    watchlist: state.movies.filter(m => !m.watched && m.watching !== true).length,
+    watching: state.movies.filter(m => m.watching === true && !m.watched).length,
+    log: state.movies.filter(m => m.watched).length,
+  };
+  return `
+    <div class="tabs">
+      <button class="tab ${state.tab==='watchlist'?'active':''}" data-tab="watchlist">watchlist${counts.watchlist ? ` <span class="tab-count">${counts.watchlist}</span>` : ''}</button>
+      <button class="tab ${state.tab==='watching'?'active':''}" data-tab="watching">watching${counts.watching ? ` <span class="tab-count tab-count--eye">${counts.watching}</span>` : ''}</button>
+      <button class="tab ${state.tab==='log'?'active':''}" data-tab="log">log${counts.log ? ` <span class="tab-count">${counts.log}</span>` : ''}</button>
+    </div>
+  `;
+}
+
+function renderWatchlist() {
+  const unwatched = state.movies.filter(m => !m.watched && m.watching !== true);
+  if (state.loading) return `<div class="watchlist-grid"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-title">loading...</div></div></div>`;
+  if (!unwatched.length) return `
+    <div class="watchlist-grid">
+      <div class="empty-state">
+        <div class="e-icon">🎬</div>
+        <div class="e-title">nothing to watch yet</div>
+        <div class="e-sub">tap + to add a movie</div>
+      </div>
+    </div>`;
+  return `<div class="watchlist-grid">${unwatched.map(renderCard).join('')}</div>`;
+}
+
+function renderWatching() {
+  const watching = state.movies.filter(m => m.watching === true && !m.watched);
+  if (!watching.length) return `
+    <div class="watchlist-grid">
+      <div class="empty-state">
+        <div class="e-icon">👁</div>
+        <div class="e-title">nothing currently watching</div>
+        <div class="e-sub">tap the eye icon on a card to mark it as watching</div>
+      </div>
+    </div>`;
+  return `<div class="watchlist-grid">${watching.map(renderCard).join('')}</div>`;
+}
+
+function renderLog() {
+  const watched = state.movies.filter(m => m.watched && m.watched_at);
+  if (!watched.length) return `
+    <div class="log-view">
+      <div class="empty-state">
+        <div class="e-icon">📅</div>
+        <div class="e-title">no movies watched yet</div>
+        <div class="e-sub">mark a movie as watched to see it here</div>
+      </div>
+    </div>`;
+  const groups = groupByMonth(watched);
+  return `<div class="log-view">${groups.map(([key, movies]) => `
+    <div class="month-group">
+      <div class="month-label">${formatMonthLabel(key)} <span>${key.split('-')[0]}</span></div>
+      <div class="month-cards">${movies.map(renderCard).join('')}</div>
+    </div>
+  `).join('')}</div>`;
+}
+
+function renderCard(movie) {
+  const posterSrc = movie.poster_url || generatePoster(movie.title);
+  const safeTitle = movie.title.replace(/"/g, '&quot;');
+  const poster = `<img src="${posterSrc}" alt="${safeTitle}" loading="lazy" data-title="${safeTitle}" onerror="this.onerror=null;this.src=generatePoster(this.dataset.title)">`;
+
+  const sub = movie.watched
+    ? formatDate(movie.watched_at)
+    : movie.watching === true
+    ? `watching · added by ${(movie.added_by||'').toLowerCase()}`
+    : `added by ${(movie.added_by||'').toLowerCase()}`;
+
+  return `
+    <div class="movie-card" data-id="${movie.id}">
+      <div class="poster-wrap">
+        ${poster}
+        <button class="card-delete" data-delete-id="${movie.id}" title="remove">✕</button>
+        ${!movie.watched ? `<button class="card-watch" data-watch-id="${movie.id}" data-watch-title="${safeTitle}" title="move to log">✓</button>` : ''}
+        ${!movie.watched && movie.watching !== true ? `<button class="card-eye" data-eye-id="${movie.id}" title="mark watching"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+      </div>
+      <div class="card-meta">
+        <div class="card-title">${movie.title}</div>
+        <div class="card-sub">${sub}</div>
+      </div>
+    </div>
+  `;
+}
+
+
+function renderAddModal() {
+  const f = state.addForm;
+  return `
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">add a movie</div>
+        <div class="field">
+          <label>title</label>
+          <input type="text" id="addTitle" placeholder="e.g. Parasite" value="${f.title}" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>note <span style="color:var(--ink3);font-size:0.58rem">(optional)</span></label>
+          <textarea id="addNote" placeholder="e.g. Sofia recommended this...">${f.note}</textarea>
+        </div>
+        <div class="field">
+          <label>adding as</label>
+          <div class="user-selector">
+            <div class="user-opt ${f.user==='User A'?'active':''}" data-u="User A">Aurinee</div>
+            <div class="user-opt ${f.user==='User B'?'active':''}" data-u="User B">user b</div>
+          </div>
+        </div>
+        <button class="submit-btn" id="submitAdd">add to watchlist</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDetailModal() {
+  const m = state.showDetail;
+  const detailPosterSrc = m.poster_url || generatePoster(m.title);
+  const poster = `<img src="${detailPosterSrc}" alt="${m.title}" onerror="this.src=generatePoster(this.dataset.title)" data-title="${m.title.replace(/"/g,'&quot;')}">`;
+
+  const actions = m.watched ? `
+    <div class="watched-badge">watched on ${formatDate(m.watched_at)}</div>
+    <div class="detail-actions">
+      <button class="delete-btn" id="doDelete">remove from log</button>
+    </div>
+  ` : `
+    <div class="detail-actions">
+      <div class="field" style="margin-bottom:10px">
+        <label>watched on</label>
+        <input type="date" id="watchDateInput" value="${state.watchDate}">
+      </div>
+      <button class="watched-btn" id="doWatched">move to log ✓</button>
+      <button class="delete-btn" id="doDelete">delete movie</button>
+    </div>
+  `;
+
+  return `
+    <div class="overlay" id="overlay">
+      <div class="detail-modal">
+        <div class="detail-poster" style="position:relative">
+          ${poster}
+          <button class="close-btn" id="closeDetail">✕</button>
+        </div>
+        <div class="detail-body">
+          <div class="detail-title">${m.title}</div>
+          <div class="detail-meta">added by ${(m.added_by||'').toLowerCase()} · ${formatDate(m.added_at)}</div>
+          ${m.note ? `<div class="detail-note">"${m.note}"</div>` : ''}
+          ${actions}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── BIND EVENTS ─────────────────────────────────────────────────────────────
+function bindSetup() {
+  document.querySelectorAll('.setup-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const user = btn.dataset.user;
+      localStorage.setItem('ourwatchlist_user', user);
+      setState({ currentUser: user, addForm: { ...state.addForm, user } });
+    });
+  });
+}
+
+function bindEvents() {
+  // Tabs
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => setState({ tab: t.dataset.tab }));
+  });
+
+  // Open add modal
+  const addBtn = document.getElementById('openAdd');
+  if (addBtn) addBtn.addEventListener('click', () => {
+    setState({ showAdd: true, addForm: { title: '', note: '', user: state.currentUser } });
+  });
+
+  // Switch user
+  const switchBtn = document.getElementById('switchUser');
+  if (switchBtn) switchBtn.addEventListener('click', () => {
+    localStorage.removeItem('ourwatchlist_user');
+    setState({ currentUser: null });
+  });
+
+  // Overlay click to close
+  const overlay = document.getElementById('overlay');
+  if (overlay) overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) setState({ showAdd: false, showDetail: null });
+  });
+
+  // Add modal
+  if (state.showAdd) {
+    const titleInput = document.getElementById('addTitle');
+    const noteInput = document.getElementById('addNote');
+    if (titleInput) titleInput.addEventListener('input', e => { state.addForm.title = e.target.value; });
+    if (noteInput) noteInput.addEventListener('input', e => { state.addForm.note = e.target.value; });
+
+    document.querySelectorAll('.user-opt').forEach(u => {
+      u.addEventListener('click', () => {
+        state.addForm.user = u.dataset.u;
+        document.querySelectorAll('.user-opt').forEach(x => x.classList.remove('active'));
+        u.classList.add('active');
+      });
+    });
+
+    const submitBtn = document.getElementById('submitAdd');
+
+    async function doSubmitAdd() {
+      const title = document.getElementById('addTitle')?.value?.trim();
+      const note = document.getElementById('addNote')?.value?.trim();
+      if (!title) { toast('please enter a title'); return; }
+      // Duplicate check — case-insensitive
+      const duplicate = state.movies.find(m => m.title.toLowerCase() === title.toLowerCase());
+      if (duplicate) {
+        const where = duplicate.watched ? 'already in your log' : 'already on the watchlist';
+        toast('"' + title + '" is ' + where);
+        return;
+      }
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'adding...'; }
+      await addMovie(title, note, state.addForm.user || state.currentUser);
+      setState({ showAdd: false });
+    }
+
+    if (submitBtn) submitBtn.addEventListener('click', doSubmitAdd);
+
+    // Enter key on title input submits
+    if (titleInput) titleInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); doSubmitAdd(); }
+    });
+  }
+
+  // Detail modal
+  if (state.showDetail) {
+    const closeBtn = document.getElementById('closeDetail');
+    if (closeBtn) closeBtn.addEventListener('click', () => setState({ showDetail: null }));
+
+    const watchedBtn = document.getElementById('doWatched');
+    if (watchedBtn) watchedBtn.addEventListener('click', async () => {
+      const date = document.getElementById('watchDateInput')?.value || state.watchDate;
+      watchedBtn.disabled = true;
+      await markWatched(state.showDetail.id, date);
+      setState({ showDetail: null });
+    });
+
+    const dateInput = document.getElementById('watchDateInput');
+    if (dateInput) dateInput.addEventListener('change', e => { state.watchDate = e.target.value; });
+
+    const deleteBtn = document.getElementById('doDelete');
+    if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+      const label = state.showDetail.watched ? 'remove from log?' : 'delete this movie?';
+      if (!confirm(label)) return;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'deleting...';
+      await deleteMovie(state.showDetail.id);
+      setState({ showDetail: null });
+    });
+  }
+
+  // Date popup logic
+  let pendingWatchId = null;
+  const datePopup = document.getElementById('datePopup');
+  const datePopupInput = document.getElementById('datePopupInput');
+  const datePopupTitle = document.getElementById('datePopupTitle');
+  const datePopupConfirm = document.getElementById('datePopupConfirm');
+  const datePopupCancel = document.getElementById('datePopupCancel');
+
+  function openDatePopup(id, title) {
+    pendingWatchId = id;
+    datePopupTitle.textContent = title;
+    datePopupInput.value = new Date().toISOString().split('T')[0];
+    datePopup.style.display = 'flex';
+    setTimeout(() => datePopupInput.focus(), 100);
+  }
+
+  function closeDatePopup() {
+    datePopup.style.display = 'none';
+    pendingWatchId = null;
+  }
+
+  if (datePopupConfirm) {
+    datePopupConfirm.addEventListener('click', async () => {
+      if (!pendingWatchId) return;
+      const date = datePopupInput.value || new Date().toISOString().split('T')[0];
+      datePopupConfirm.disabled = true;
+      datePopupConfirm.textContent = 'moving...';
+      await markWatched(pendingWatchId, date);
+      closeDatePopup();
+      datePopupConfirm.disabled = false;
+      datePopupConfirm.textContent = 'move to log ✓';
+    });
+  }
+
+  if (datePopupCancel) datePopupCancel.addEventListener('click', closeDatePopup);
+  if (datePopup) datePopup.addEventListener('click', e => { if (e.target === datePopup) closeDatePopup(); });
+
+  // Enter key in date popup confirms
+  if (datePopupInput) {
+    datePopupInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') datePopupConfirm.click();
+    });
+  }
+
+  // Card eye buttons (mark as watching)
+  document.querySelectorAll('.card-eye').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.eyeId;
+      btn.style.opacity = '0.4';
+      await markWatching(id);
+      setState({ tab: 'watching' });
+    });
+  });
+
+  // Card watch buttons (move to log)
+  document.querySelectorAll('.card-watch').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDatePopup(btn.dataset.watchId, btn.dataset.watchTitle);
+    });
+  });
+
+  // Card delete buttons (stop propagation so it doesn't open detail)
+  document.querySelectorAll('.card-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.deleteId;
+      const movie = state.movies.find(m => m.id === id);
+      if (!movie) return;
+      const label = movie.watched ? 'remove from log?' : 'delete "' + movie.title + '"?';
+      if (!confirm(label)) return;
+      btn.textContent = '…';
+      await deleteMovie(id);
+    });
+  });
+
+  // Card clicks (open detail)
+  document.querySelectorAll('.movie-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.id;
+      const movie = state.movies.find(m => m.id === id);
+      if (movie) setState({ showDetail: movie });
+    });
+  });
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+async function init() {
+  render();
+  await loadMovies();
+  subscribeRealtime();
+}
+
+init();
+</script>
+
+<!-- PWA MANIFEST (inline) -->
+<script>
+const manifestData = {
+  name: "Our Watchlist",
+  short_name: "Our Watchlist",
+  description: "A shared movie watchlist for two",
+  start_url: "/",
+  display: "standalone",
+  background_color: "#f2ede6",
+  theme_color: "#f2ede6",
+  icons: [{
+    src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1714'/><text y='.9em' font-size='80' x='10'>🎬</text></svg>",
+    sizes: "any",
+    type: "image/svg+xml"
+  }]
+};
+const blob = new Blob([JSON.stringify(manifestData)], {type:'application/json'});
+const manifestURL = URL.createObjectURL(blob);
+document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+</script>
+</body>
+</html>
