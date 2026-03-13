@@ -238,7 +238,6 @@
     position: relative;
     z-index: 1;
   }
-
   /* CARD DELETE OVERLAY - Letterboxd style */
   .poster-wrap {
     position: relative;
@@ -1222,7 +1221,6 @@ function renderHeader() {
     <header class="header">
       <div class="logo">Our Watchlist</div>
       <div class="header-right">
-        <button class="user-badge" id="switchUser">${state.currentUser.toLowerCase()}</button>
         <button class="add-btn" id="openAdd">+</button>
       </div>
     </header>
@@ -1272,7 +1270,7 @@ function renderWatching() {
 }
 
 function renderLog() {
-  const watched = state.movies.filter(m => m.watched && m.watched_at);
+  const watched = state.movies.filter(m => m.watched && m.watched_at).sort((a,b) => new Date(b.watched_at) - new Date(a.watched_at));
   if (!watched.length) return `
     <div class="log-view">
       <div class="empty-state">
@@ -1607,4 +1605,5 @@ const manifestURL = URL.createObjectURL(blob);
 document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
 </script>
 </body>
+
 </html>
