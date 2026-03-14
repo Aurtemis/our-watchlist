@@ -238,6 +238,7 @@
     position: relative;
     z-index: 1;
   }
+
   /* CARD DELETE OVERLAY - Letterboxd style */
   .poster-wrap {
     position: relative;
@@ -974,13 +975,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ─── OMDB ────────────────────────────────────────────────────────────────────
 const OMDB_KEY = '2d010114';
 
+async function searchMovies(query) {
+  try {
+    const r = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&apikey=${OMDB_KEY}`);
+    const d = await r.json();
+    if (d.Search) return d.Search.slice(0, 5);
+  } catch(e) {}
+  return [];
+}
+
 async function fetchPoster(title) {
   try {
     const r = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${OMDB_KEY}`);
     const d = await r.json();
     if (d.Poster && d.Poster !== 'N/A') return d.Poster;
   } catch(e) {}
-  // Generate a cinematic SVG poster based on title
   return generatePoster(title);
 }
 
@@ -1093,9 +1102,10 @@ async function loadMovies() {
 
 async function addMovie(title, note, addedBy) {
   showLoading();
-  let posterUrl = null;
-  try { posterUrl = await fetchPoster(title); } catch(e) { console.error('poster fetch failed', e); }
-  console.log('Inserting movie:', { title, note, added_by: addedBy, poster_url: posterUrl });
+  let posterUrl = state.addForm.selectedPoster || null;
+  if (!posterUrl) {
+    try { posterUrl = await fetchPoster(title); } catch(e) {}
+  }
   const { data, error } = await sb.from('movies').insert([{
     title: title,
     note: note || null,
@@ -1106,11 +1116,9 @@ async function addMovie(title, note, addedBy) {
   }]).select();
   hideLoading();
   if (error) {
-    console.error('Supabase insert error:', JSON.stringify(error));
     toast('error: ' + (error.message || 'insert failed'));
     return;
   }
-  console.log('Insert success:', data);
   toast('"' + title + '" added ✓');
 }
 
@@ -1208,8 +1216,8 @@ function renderSetup() {
         <div class="setup-logo">Our Watchlist</div>
         <div class="setup-label">choose your profile</div>
         <div class="setup-opts">
-          <button class="setup-opt" data-user="User A">Aurinee</button>
-          <button class="setup-opt" data-user="User B">user b</button>
+          <input type="text" id="setupName" placeholder="your name..." style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;font-family:var(--font-body);font-size:0.9rem;color:var(--ink);outline:none;margin-bottom:10px">
+          <button class="setup-opt" id="setupConfirm">let's go →</button>
         </div>
       </div>
     </div>
@@ -1297,7 +1305,7 @@ function renderCard(movie) {
     ? formatDate(movie.watched_at)
     : movie.watching === true
     ? `watching · added by ${(movie.added_by||'').toLowerCase()}`
-    : `added by ${(movie.added_by||'').toLowerCase()}`;
+    : `added by ${movie.added_by||''.toLowerCase()}`
 
   return `
     <div class="movie-card" data-id="${movie.id}">
@@ -1323,10 +1331,17 @@ function renderAddModal() {
       <div class="modal">
         <div class="modal-handle"></div>
         <div class="modal-title">add a movie</div>
-        <div class="field">
+        <div class="field" style="position:relative">
           <label>title</label>
-          <input type="text" id="addTitle" placeholder="e.g. Parasite" value="${f.title}" autocomplete="off">
+          <input type="text" id="addTitle" placeholder="search for a movie..." value="${f.title}" autocomplete="off">
+          <div id="searchResults" style="
+            position:absolute; top:100%; left:0; right:0; z-index:50;
+            background:var(--card-bg); border:1px solid var(--border);
+            border-top:none; border-radius:0 0 var(--r) var(--r);
+            max-height:240px; overflow-y:auto; display:none;
+          "></div>
         </div>
+        ${f.selectedYear ? `<div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--ink3);margin:-8px 0 12px;padding-left:2px">${f.selectedYear} · matched from omdb</div>` : ''}
         <div class="field">
           <label>note <span style="color:var(--ink3);font-size:0.58rem">(optional)</span></label>
           <textarea id="addNote" placeholder="e.g. Sofia recommended this...">${f.note}</textarea>
@@ -1334,7 +1349,7 @@ function renderAddModal() {
         <div class="field">
           <label>adding as</label>
           <div class="user-selector">
-            <div class="user-opt ${f.user==='User A'?'active':''}" data-u="User A">Aurinee</div>
+            <div class="user-opt ${f.user==='User A'?'active':''}" data-u="User A">user a</div>
             <div class="user-opt ${f.user==='User B'?'active':''}" data-u="User B">user b</div>
           </div>
         </div>
@@ -1419,11 +1434,10 @@ function bindEvents() {
     if (e.target === overlay) setState({ showAdd: false, showDetail: null });
   });
 
-  // Add modal
+ // Add modal
   if (state.showAdd) {
     const titleInput = document.getElementById('addTitle');
     const noteInput = document.getElementById('addNote');
-    if (titleInput) titleInput.addEventListener('input', e => { state.addForm.title = e.target.value; });
     if (noteInput) noteInput.addEventListener('input', e => { state.addForm.note = e.target.value; });
 
     document.querySelectorAll('.user-opt').forEach(u => {
@@ -1434,13 +1448,69 @@ function bindEvents() {
       });
     });
 
+    // Live search dropdown
+    if (titleInput) {
+      let searchTimer = null;
+      titleInput.addEventListener('input', e => {
+        state.addForm.title = e.target.value;
+        state.addForm.selectedYear = null;
+        state.addForm.selectedPoster = null;
+        clearTimeout(searchTimer);
+        const q = e.target.value.trim();
+        const resultsEl = document.getElementById('searchResults');
+        if (q.length < 2) { resultsEl.style.display = 'none'; return; }
+        searchTimer = setTimeout(async () => {
+          const results = await searchMovies(q);
+          if (!results.length) { resultsEl.style.display = 'none'; return; }
+          resultsEl.style.display = 'block';
+          resultsEl.innerHTML = results.map(r => `
+            <div class="search-result-item" data-title="${r.Title.replace(/"/g,'&quot;')}" data-year="${r.Year}" data-poster="${r.Poster !== 'N/A' ? r.Poster : ''}">
+              <img src="${r.Poster !== 'N/A' ? r.Poster : ''}" onerror="this.style.display='none'" style="width:32px;height:46px;object-fit:cover;border-radius:2px;flex-shrink:0;background:var(--bg2)">
+              <div>
+                <div style="font-family:var(--font-body);font-size:0.82rem;color:var(--ink)">${r.Title}</div>
+                <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ink3)">${r.Year}</div>
+              </div>
+            </div>
+          `).join('') + `
+            <div class="search-result-item" data-title="${titleInput.value.trim().replace(/"/g,'&quot;')}" data-year="" data-poster="">
+              <div style="width:32px;height:46px;border-radius:2px;flex-shrink:0;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:1rem">🎬</div>
+              <div>
+                <div style="font-family:var(--font-body);font-size:0.82rem;color:var(--ink)">none of these</div>
+                <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ink3)">use generated poster instead</div>
+              </div>
+            </div>
+          `;
+          resultsEl.querySelectorAll('.search-result-item').forEach(item => {
+            Object.assign(item.style, {
+              display: 'flex', gap: '10px', alignItems: 'center',
+              padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)'
+            });
+            item.addEventListener('mouseenter', () => item.style.background = 'var(--bg2)');
+            item.addEventListener('mouseleave', () => item.style.background = '');
+            item.addEventListener('click', () => {
+              state.addForm.title = item.dataset.title;
+              state.addForm.selectedYear = item.dataset.year;
+              state.addForm.selectedPoster = item.dataset.poster || null;
+              titleInput.value = item.dataset.title;
+              resultsEl.style.display = 'none';
+              render();
+            });
+          });
+        }, 350);
+      });
+
+      titleInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); doSubmitAdd(); }
+        if (e.key === 'Escape') { document.getElementById('searchResults').style.display = 'none'; }
+      });
+    }
+
     const submitBtn = document.getElementById('submitAdd');
 
     async function doSubmitAdd() {
       const title = document.getElementById('addTitle')?.value?.trim();
       const note = document.getElementById('addNote')?.value?.trim();
       if (!title) { toast('please enter a title'); return; }
-      // Duplicate check — case-insensitive
       const duplicate = state.movies.find(m => m.title.toLowerCase() === title.toLowerCase());
       if (duplicate) {
         const where = duplicate.watched ? 'already in your log' : 'already on the watchlist';
@@ -1453,11 +1523,6 @@ function bindEvents() {
     }
 
     if (submitBtn) submitBtn.addEventListener('click', doSubmitAdd);
-
-    // Enter key on title input submits
-    if (titleInput) titleInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); doSubmitAdd(); }
-    });
   }
 
   // Detail modal
@@ -1605,5 +1670,4 @@ const manifestURL = URL.createObjectURL(blob);
 document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
 </script>
 </body>
-
 </html>
