@@ -562,15 +562,32 @@ function generateCode() {
 }
 
 // ─── LOCAL SESSION ────────────────────────────────────────────────────────────
-const SESSION_KEY = 'ourwatchlist_session';
-function getSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch(e) { return null; } }
-function saveSession(s) { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
-function clearSession() { localStorage.removeItem(SESSION_KEY); }
+const SESSION_KEY = 'ourwatchlist_sessions';
+const ACTIVE_KEY  = 'ourwatchlist_active';
+
+function getAllSessions() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || []; } catch(e) { return []; } }
+function getActiveIndex() { return parseInt(localStorage.getItem(ACTIVE_KEY) || '0'); }
+function getSession() { const all = getAllSessions(); return all[getActiveIndex()] || null; }
+function saveSession(s) {
+  const all = getAllSessions();
+  const idx = all.findIndex(x => x.groupId === s.groupId);
+  if (idx >= 0) all[idx] = s; else all.push(s);
+  localStorage.setItem(SESSION_KEY, JSON.stringify(all));
+  localStorage.setItem(ACTIVE_KEY, String(all.findIndex(x => x.groupId === s.groupId)));
+}
+function clearSession() {
+  const all = getAllSessions();
+  all.splice(getActiveIndex(), 1);
+  localStorage.setItem(SESSION_KEY, JSON.stringify(all));
+  localStorage.setItem(ACTIVE_KEY, '0');
+}
+function switchToGroup(idx) { localStorage.setItem(ACTIVE_KEY, String(idx)); }
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let state = {
   // session
-  session: getSession(), // { groupId, groupCode, userName, members[] }
+  session: getSession(),     // { groupId, groupCode, userName }
+  allSessions: getAllSessions(),
   // setup flow: 'landing' | 'create_name' | 'create_done' | 'join_code' | 'join_name'
   setupStep: 'landing',
   setupData: { code: '', name: '', groupId: null },
@@ -718,6 +735,7 @@ function render() {
 function renderSetup() {
   const { setupStep: step, setupData: data, setupError: err } = state;
 
+  const hasExistingGroups = getAllSessions().length > 0;
   if (step === 'landing') return `
     <div class="setup-screen"><div class="setup-card">
       <div class="setup-logo">Our Watchlist</div>
@@ -725,6 +743,7 @@ function renderSetup() {
       <div class="setup-actions">
         <button class="setup-primary" id="goCreate">create a group</button>
         <button class="setup-secondary" id="goJoin">join a group</button>
+        ${hasExistingGroups ? `<button class="setup-back" id="goBackToApp" style="text-align:center;margin-top:4px">← back to my groups</button>` : ''}
       </div>
     </div></div>`;
 
@@ -785,6 +804,15 @@ function bindSetup() {
   const doEnter = document.getElementById('doEnter');
 
   if (goCreate) goCreate.addEventListener('click', () => setState({ setupStep: 'create_name', setupError: '' }));
+  const goBackToApp = document.getElementById('goBackToApp');
+  if (goBackToApp) goBackToApp.addEventListener('click', () => {
+    const sessions = getAllSessions();
+    if (sessions.length > 0) {
+      const s = sessions[getActiveIndex()] || sessions[0];
+      setState({ session: s, allSessions: sessions });
+      loadMovies(); loadMembers(); subscribeRealtime();
+    }
+  });
   if (goJoin) goJoin.addEventListener('click', () => setState({ setupStep: 'join_code', setupError: '' }));
   if (goBack) goBack.addEventListener('click', () => {
     const prev = step === 'create_name' ? 'landing' : step === 'join_code' ? 'landing' : step === 'join_name' ? 'join_code' : 'landing';
@@ -813,7 +841,7 @@ function bindSetup() {
       const { groupId, code, name } = state.setupData;
       const session = { groupId, groupCode: code, userName: name };
       saveSession(session);
-      setState({ session, setupStep: 'landing', setupData: { code:'', name:'', groupId: null }, loading: true });
+      setState({ session, allSessions: getAllSessions(), setupStep: 'landing', setupData: { code:'', name:'', groupId: null }, loading: true });
       loadMovies(); loadMembers(); subscribeRealtime();
     });
   }
@@ -846,7 +874,7 @@ function bindSetup() {
       if (res.error) { setState({ setupError: res.error }); doJoin.disabled = false; doJoin.textContent = 'join group →'; return; }
       const session = { groupId: res.groupId, groupCode: state.setupData.code, userName: name };
       saveSession(session);
-      setState({ session, setupStep: 'landing', setupData: { code:'', name:'', groupId: null }, loading: true });
+      setState({ session, allSessions: getAllSessions(), setupStep: 'landing', setupData: { code:'', name:'', groupId: null }, loading: true });
       loadMovies(); loadMembers(); subscribeRealtime();
     };
     doJoin.addEventListener('click', submit);
@@ -998,16 +1026,29 @@ function renderUserMenu() {
     ? members.map(m => `<span class="member-pill ${m.name===state.session.userName?'me':''}">${m.name.toLowerCase()}</span>`).join('')
     : `<span class="member-pill">${state.session.userName.toLowerCase()}</span>`;
 
+  const allSessions = getAllSessions();
+  const activeIdx = getActiveIndex();
+  const groupSwitcher = allSessions.length > 1 ? `
+    <div class="user-menu-members" style="margin-bottom:16px">
+      <div class="user-menu-members-title">your groups</div>
+      ${allSessions.map((s, i) => `
+        <span class="member-pill ${i === activeIdx ? 'me' : ''}" style="cursor:pointer" data-switch-idx="${i}">
+          ${s.groupCode}
+        </span>`).join('')}
+    </div>` : '';
+
   return `
     <div class="user-menu" id="userMenuOverlay">
       <div class="user-menu-card">
         <div class="user-menu-name">${state.session.userName}</div>
         <div class="user-menu-group">group code: ${state.session.groupCode}</div>
+        ${groupSwitcher}
         <div class="user-menu-members">
           <div class="user-menu-members-title">members in this group</div>
           ${memberPills}
         </div>
-        <button class="leave-btn" id="doLeave">leave group</button>
+        <button class="secondary-btn" id="doAddGroup" style="margin-bottom:8px">+ join or create another group</button>
+        <button class="leave-btn" id="doLeave">leave this group</button>
       </div>
     </div>`;
 }
@@ -1040,8 +1081,27 @@ function bindEvents() {
   if (doLeave) doLeave.addEventListener('click', () => {
     if (!confirm('leave this group? you can rejoin anytime with the same code and name.')) return;
     clearSession();
-    setState({ session: null, movies: [], members: [], showUserMenu: false, loading: true, setupStep: 'landing' });
+    const nextSession = getSession();
+    setState({ session: nextSession, allSessions: getAllSessions(), movies: [], members: [], showUserMenu: false, loading: true, setupStep: 'landing', tab: 'watchlist' });
     if (realtimeChannel) sb.removeChannel(realtimeChannel);
+    if (nextSession) { loadMovies(); loadMembers(); subscribeRealtime(); }
+  });
+
+  const doAddGroup = document.getElementById('doAddGroup');
+  if (doAddGroup) doAddGroup.addEventListener('click', () => {
+    setState({ showUserMenu: false, session: null, setupStep: 'landing', setupError: '' });
+  });
+
+  document.querySelectorAll('[data-switch-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.switchIdx);
+      if (idx === getActiveIndex()) { setState({ showUserMenu: false }); return; }
+      switchToGroup(idx);
+      const newSession = getAllSessions()[idx];
+      if (realtimeChannel) sb.removeChannel(realtimeChannel);
+      setState({ session: newSession, allSessions: getAllSessions(), showUserMenu: false, movies: [], members: [], loading: true, tab: 'watchlist' });
+      loadMovies(); loadMembers(); subscribeRealtime();
+    });
   });
 
   // add modal
