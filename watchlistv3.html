@@ -1265,5 +1265,11 @@ const manifestData = { name:"Our Watchlist", short_name:"Our Watchlist", descrip
 const blob = new Blob([JSON.stringify(manifestData)],{type:'application/json'});
 document.head.insertAdjacentHTML('beforeend',`<link rel="manifest" href="${URL.createObjectURL(blob)}">`);
 </script>
+
+<!-- Vercel Speed Insights -->
+<script>
+  window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/speed-insights/script.js"></script>
 </body>
 </html>
