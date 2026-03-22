@@ -263,11 +263,11 @@
     background: var(--card-bg); width: 100%; max-width: 480px;
     border-radius: 16px 16px 0 0;
     animation: sheetUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
-    overflow: hidden; max-height: 92vh; display: flex; flex-direction: column;
+    overflow-y: auto; max-height: 92vh;
   }
   @media (min-width: 600px) { .detail-modal { border-radius: 12px; max-height: 88vh; } }
-  .detail-poster { width: 100%; aspect-ratio: 16/9; background: var(--bg2); flex-shrink: 0; position: relative; }
-  .detail-poster img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-poster { width: 100%; background: var(--bg2); position: relative; }
+  .detail-poster img { width: 100%; height: auto; display: block; object-fit: contain; }
   .detail-body { padding: 20px 24px 32px; overflow-y: auto; }
   .detail-title { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin-bottom: 6px; line-height: 1.2; }
   .detail-meta { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink3); margin-bottom: 14px; text-transform: lowercase; letter-spacing: 0.04em; }
