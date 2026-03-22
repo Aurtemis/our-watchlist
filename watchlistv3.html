@@ -545,7 +545,8 @@ function toast(msg) {
 }
 function formatDate(d) {
   if (!d) return '';
-  const date = new Date(d + 'T00:00:00');
+  const date = new Date(d);
+  if (isNaN(date)) return '';
   return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`;
 }
 function getMonthKey(d) { const date = new Date(d); return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`; }
@@ -991,8 +992,12 @@ function renderDetailModal() {
   const isOwner = m.added_by === state.session.userName;
 
   const actions = m.watched ? `
-    <div class="watched-badge">watched on ${formatDate(m.watched_at)}</div>
     <div class="detail-actions">
+      <div class="field" style="margin-bottom:10px">
+        <label>watched on</label>
+        <input type="date" id="watchDateInput" value="${m.watched_at}">
+      </div>
+      <button class="watched-btn" id="doUpdateDate">update date</button>
       ${isOwner ? `<button class="delete-btn" id="doDelete">remove from log</button>` : ''}
     </div>` : `
     <div class="detail-actions">
@@ -1185,6 +1190,16 @@ function bindEvents() {
 
     const dateInput = document.getElementById('watchDateInput');
     if (dateInput) dateInput.addEventListener('change', e => { state.watchDate = e.target.value; });
+
+    const updateDateBtn = document.getElementById('doUpdateDate');
+    if (updateDateBtn) updateDateBtn.addEventListener('click', async () => {
+      const date = document.getElementById('watchDateInput')?.value;
+      if (!date) { toast('please pick a date'); return; }
+      updateDateBtn.disabled = true; updateDateBtn.textContent = 'saving...';
+      const { error } = await sb.from('movies').update({ watched_at: date }).eq('id', state.showDetail.id);
+      if (error) { toast('error: ' + error.message); updateDateBtn.disabled = false; updateDateBtn.textContent = 'update date'; }
+      else { toast('date updated ✓'); setState({ showDetail: null }); }
+    });
 
     const deleteBtn = document.getElementById('doDelete');
     if (deleteBtn) deleteBtn.addEventListener('click', async () => {
