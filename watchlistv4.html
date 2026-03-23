@@ -145,7 +145,7 @@
   @media (min-width: 1100px) { .watchlist-grid { grid-template-columns: repeat(6, 1fr); } }
 
   /* ── MOVIE CARD ── */
-  .movie-card { cursor: pointer; animation: fadeUp 0.4s ease both; }
+  .movie-card { cursor: pointer; animation: fadeUp 0.4s ease both; min-width: 0; }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
   .movie-card:nth-child(1) { animation-delay: 0.05s; }
   .movie-card:nth-child(2) { animation-delay: 0.10s; }
@@ -159,9 +159,10 @@
     border-radius: var(--r); overflow: hidden;
     background: var(--bg2); box-shadow: var(--shadow);
     transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s;
+    width: 100%;
   }
   .movie-card:hover .poster-wrap { transform: translateY(-4px) scale(1.02); box-shadow: var(--shadow-lg); }
-  .poster-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .poster-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
   /* card action buttons */
   .card-btn {
@@ -554,7 +555,9 @@ function formatMonthLabel(key) { const [y,m] = key.split('-'); return new Date(p
 function groupByMonth(movies) {
   const groups = {};
   movies.forEach(m => { const k = getMonthKey(m.watched_at); if (!groups[k]) groups[k]=[]; groups[k].push(m); });
-  return Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
+  return Object.entries(groups)
+    .sort((a,b) => b[0].localeCompare(a[0]))
+    .map(([key, ms]) => [key, ms.sort((a,b) => new Date(b.watched_at) - new Date(a.watched_at))]);
 }
 function generateCode() {
   const words = ['FILM','REEL','CINE','FLICK','SCREEN','LENS','FRAME','SCENE'];
