@@ -137,12 +137,12 @@
   /* ── GRID ── */
   .watchlist-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
   }
-  @media (min-width: 600px) { .watchlist-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; } }
-  @media (min-width: 900px) { .watchlist-grid { grid-template-columns: repeat(5, 1fr); gap: 16px; } }
-  @media (min-width: 1100px) { .watchlist-grid { grid-template-columns: repeat(6, 1fr); } }
+  @media (min-width: 600px) { .watchlist-grid { grid-template-columns: repeat(5, 1fr); gap: 12px; } }
+  @media (min-width: 900px) { .watchlist-grid { grid-template-columns: repeat(6, 1fr); gap: 14px; } }
+  @media (min-width: 1100px) { .watchlist-grid { grid-template-columns: repeat(8, 1fr); } }
 
   /* ── MOVIE CARD ── */
   .movie-card { cursor: pointer; animation: fadeUp 0.4s ease both; min-width: 0; }
@@ -187,11 +187,11 @@
 
   .card-meta { padding: 6px 2px 0; }
   .card-title {
-    font-family: var(--font-body); font-size: 0.72rem; font-weight: 500;
+    font-family: var(--font-body); font-size: 0.94rem; font-weight: 500;
     color: var(--ink); white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; line-height: 1.3;
   }
-  .card-sub { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink3); margin-top: 2px; text-transform: lowercase; }
+  .card-sub { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink3); margin-top: 2px; text-transform: lowercase; }
 
   /* ── EMPTY STATE ── */
   .empty-state { grid-column: 1/-1; text-align: center; padding: 60px 20px; }
@@ -203,9 +203,10 @@
   .month-group { margin-bottom: 40px; animation: fadeUp 0.4s ease both; }
   .month-label { font-family: var(--font-display); font-size: 1.6rem; font-style: italic; font-weight: 400; color: var(--ink); margin-bottom: 16px; letter-spacing: -0.02em; }
   .month-label span { font-family: var(--font-mono); font-size: 0.65rem; color: var(--ink3); font-style: normal; margin-left: 10px; vertical-align: middle; letter-spacing: 0.05em; }
-  .month-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  @media (min-width: 600px) { .month-cards { grid-template-columns: repeat(4, 1fr); gap: 14px; } }
-  @media (min-width: 900px) { .month-cards { grid-template-columns: repeat(5, 1fr); gap: 16px; } }
+  .month-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (min-width: 600px) { .month-cards { grid-template-columns: repeat(5, 1fr); gap: 12px; } }
+  @media (min-width: 900px) { .month-cards { grid-template-columns: repeat(6, 1fr); gap: 14px; } }
+  @media (min-width: 1100px) { .month-cards { grid-template-columns: repeat(8, 1fr); } }
 
   /* ── OVERLAY / MODAL ── */
   .overlay {
@@ -468,13 +469,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ─── OMDB ────────────────────────────────────────────────────────────────────
 const OMDB_KEY = '2d010114';
 
-async function searchMovies(query) {
+async function searchMovies(query, page = 1) {
   try {
-    const r = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&apikey=${OMDB_KEY}`);
+    const r = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&page=${page}&apikey=${OMDB_KEY}`);
     const d = await r.json();
-    if (d.Search) return d.Search.slice(0, 5);
+    if (d.Search) return { results: d.Search, total: parseInt(d.totalResults) || 0 };
   } catch(e) {}
-  return [];
+  return { results: [], total: 0 };
 }
 
 async function fetchPoster(title) {
@@ -1131,31 +1132,58 @@ function bindEvents() {
         const resultsEl = document.getElementById('searchResults');
         if (q.length < 2) { resultsEl.style.display = 'none'; return; }
         searchTimer = setTimeout(async () => {
-          const results = await searchMovies(q);
-          if (!results.length) { resultsEl.style.display = 'none'; return; }
-          resultsEl.style.display = 'block';
-          resultsEl.innerHTML = results.map(r => `
-            <div class="search-result-item" data-title="${r.Title.replace(/"/g,'&quot;')}" data-year="${r.Year}" data-poster="${r.Poster !== 'N/A' ? r.Poster : ''}">
-              <img src="${r.Poster !== 'N/A' ? r.Poster : ''}" onerror="this.style.display='none'" style="width:32px;height:46px;object-fit:cover;border-radius:2px;flex-shrink:0;background:var(--bg2)">
-              <div><div style="font-family:var(--font-body);font-size:0.82rem;color:var(--ink)">${r.Title}</div><div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ink3)">${r.Year}</div></div>
-            </div>`).join('') + `
-            <div class="search-result-item" data-title="${titleInput.value.trim().replace(/"/g,'&quot;')}" data-year="" data-poster="">
-              <div style="width:32px;height:46px;border-radius:2px;flex-shrink:0;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:1rem">🎬</div>
-              <div><div style="font-family:var(--font-body);font-size:0.82rem;color:var(--ink)">none of these</div><div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ink3)">use generated poster</div></div>
-            </div>`;
-          resultsEl.querySelectorAll('.search-result-item').forEach(item => {
-            Object.assign(item.style, { display:'flex', gap:'10px', alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid var(--border)' });
-            item.addEventListener('mouseenter', () => item.style.background = 'var(--bg2)');
-            item.addEventListener('mouseleave', () => item.style.background = '');
-            item.addEventListener('click', () => {
-              state.addForm.title = item.dataset.title;
-              state.addForm.selectedYear = item.dataset.year;
-              state.addForm.selectedPoster = item.dataset.poster || null;
-              titleInput.value = item.dataset.title;
-              resultsEl.style.display = 'none';
-              render();
+          let currentPage = 1;
+          let allResults = [];
+
+          async function loadAndRender(page) {
+            const { results, total } = await searchMovies(q, page);
+            if (!results.length && page === 1) { resultsEl.style.display = 'none'; return; }
+            allResults = page === 1 ? results : [...allResults, ...results];
+            const hasMore = allResults.length < total;
+            resultsEl.style.display = 'block';
+
+            const itemsHTML = allResults.map(r => `
+              <div class="search-result-item" data-title="${r.Title.replace(/"/g,'&quot;')}" data-year="${r.Year}" data-poster="${r.Poster !== 'N/A' ? r.Poster : ''}">
+                <img src="${r.Poster !== 'N/A' ? r.Poster : ''}" onerror="this.style.display='none'" style="width:32px;height:46px;object-fit:cover;border-radius:2px;flex-shrink:0;background:var(--bg2)">
+                <div><div style="font-family:var(--font-body);font-size:0.82rem;color:var(--ink)">${r.Title}</div><div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ink3)">${r.Year}</div></div>
+              </div>`).join('');
+
+            const noneHTML = `
+              <div class="search-result-item" data-title="${titleInput.value.trim().replace(/"/g,'&quot;')}" data-year="" data-poster="">
+                <div style="width:32px;height:46px;border-radius:2px;flex-shrink:0;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:1rem">🎬</div>
+                <div><div style="font-family:var(--font-body);font-size:0.82rem;color:var(--ink)">none of these</div><div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ink3)">use generated poster</div></div>
+              </div>`;
+
+            const seeMoreHTML = hasMore ? `
+              <div id="seeMoreBtn" style="padding:10px 12px;text-align:center;cursor:pointer;font-family:var(--font-mono);font-size:0.65rem;color:var(--ink3);letter-spacing:0.04em;border-top:1px solid var(--border)">
+                see more (${total - allResults.length} more)
+              </div>` : '';
+
+            resultsEl.innerHTML = itemsHTML + noneHTML + seeMoreHTML;
+
+            resultsEl.querySelectorAll('.search-result-item').forEach(item => {
+              Object.assign(item.style, { display:'flex', gap:'10px', alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid var(--border)' });
+              item.addEventListener('mouseenter', () => item.style.background = 'var(--bg2)');
+              item.addEventListener('mouseleave', () => item.style.background = '');
+              item.addEventListener('click', () => {
+                state.addForm.title = item.dataset.title;
+                state.addForm.selectedYear = item.dataset.year;
+                state.addForm.selectedPoster = item.dataset.poster || null;
+                titleInput.value = item.dataset.title;
+                resultsEl.style.display = 'none';
+                render();
+              });
             });
-          });
+
+            const seeMoreBtn = document.getElementById('seeMoreBtn');
+            if (seeMoreBtn) seeMoreBtn.addEventListener('click', async () => {
+              seeMoreBtn.textContent = 'loading...';
+              currentPage++;
+              await loadAndRender(currentPage);
+            });
+          }
+
+          await loadAndRender(currentPage);
         }, 350);
       });
       titleInput.addEventListener('keydown', e => {
